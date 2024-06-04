@@ -1,0 +1,230 @@
+(function() {
+    //Utility functions
+    function slugify(text)
+    {
+        return text.toString().toLowerCase()
+            .replace(/\s+/g, '-')           // Replace spaces with -
+            .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
+            .replace(/\-\-+/g, '-')         // Replace multiple - with single -
+            .replace(/^-+/, '')             // Trim - from start of text
+            .replace(/-+$/, '');            // Trim - from end of text
+    }
+
+    //Example of function to inhibit fire of event on certain conditions
+    function always() {
+        return true;
+    }
+
+    function get_link_title(data) {
+        var title_section = slugify(data.el.text());
+        data.label = title_section;
+        return data;
+    }
+
+    function get_room_title(data) {
+        var title_section = slugify(data.el.text());
+        data.label = data.label +' - ' + title_section;
+        return data;
+    }
+
+    function get_filter_title(data){
+        var title_filter = slugify(data.el.context.name);
+        data.label = title_filter;
+        return data;
+    }
+
+    function get_offer_name(data){
+        var title_offer = slugify(data.el.closest('.hotel_offer').find('.alt_title a').text());
+        data.label = title_offer;
+        return data;
+    }
+
+    function get_offer_name_cpt(data){
+        var title_single_offer = slugify(data.el.closest('.offer').find('.alt_title a').text());
+        data.label = title_single_offer;
+        return data;
+    }
+
+    function get_hotels_name(data){
+        var title_hotel = slugify(data.el.closest('.other_hotels_box .hotel').find('.alt_title a').text());
+        data.label = title_hotel;
+        return data;
+    }
+
+    function zpad(s){
+        s = ''+s;
+        if(s.length <2){
+            s = '0'+s;
+        }
+        return s;
+    }
+
+    function read_bf_setting(data){
+        var f = data.el;
+        var number_rooms = f.find('select[name="roomNumber"]').val();
+        var number_nights = f.find('input[name="nightNb"]').val();
+        var number_adults = f.find('select[name="room[0].adultNumber"]').val();
+        var number_children = f.find('select[name="room[0].childrenNumber"]').val();
+        var arrival_date = f.find('input[name="dayIn"]').val() + '/' +f.find('input[name="monthIn"]').val() +'/' +f.find('input[name="yearIn"]').val();
+        var arrival_date_obj = new Date(parseInt(f.find('input[name="yearIn"]').val()), parseInt(f.find('input[name="monthIn"]').val()) -1,parseInt(f.find('input[name="dayIn"]').val()),0,0,0,0);
+        var departure_date_obj = new Date(arrival_date_obj.getTime()+parseInt(f.find('input[name="nightNb"]').val()*86400000));
+        var departure_date = zpad(departure_date_obj.getDate()) + '/' + zpad(departure_date_obj.getMonth()+1) + '/' + departure_date_obj.getFullYear();
+        data.searchcriteriaarrivaldate = arrival_date;
+        data.searchcriteriadeparturedate = departure_date;
+        data.searchcriterianumberrooms = number_rooms;
+        data.searchcriterianumberadults = number_adults;
+        data.searchcriterianumberchildren = number_children;
+        data.searchcriterianumbernights = number_nights;
+        return data;
+    }
+
+    function convertToAccorFormat(dlObject, configuration, eventData, jQueryEvent){
+        var obj = {
+            "event" : "gaevent",
+            "eventCategory" : dlObject.category,
+            "eventAction" : dlObject.action,
+            "eventLabel" : dlObject.label
+        };
+
+        var optional = ["searchcriteriaarrivaldate","searchcriteriadeparturedate","searchcriterianumberrooms","searchcriterianumberadults","searchcriterianumberchildren", "searchcriterianumbernights"];
+
+        for(var i = 0; i < optional.length; i++){
+            var key = optional[i];
+            if(typeof eventData[key] !== 'undefined'){
+                obj[key] = eventData[key];
+            }
+        }
+
+        return obj;
+    }
+
+    var tmp = {
+        'docready' : [
+            {formatDlObject:function(dlObject, configuration, eventData, jQueryEvent){
+                var o = {"event" : "push_dynamic_datas", "dynamic_datas_ready": "true"},
+                    fields = ['pagename','category','sub_category_level1','sub_category_level2','virtualpageurl','hotelcountryname','hotelcityname','hotelname','hotelcode'];
+                for (var i = 0; i < fields.length; i++){
+                    var field = fields[i];
+                    if(typeof mantis_custom_dl[field] !== 'undefined' && mantis_custom_dl[field] != ''){
+                        o[field] = mantis_custom_dl[field];
+                    }
+                }
+                return o;
+                }},
+        ],
+        'mantis.hotel_section_details_room':[
+            {'selector': '.popup_fancy', formatDlObject:function(dlObject, configuration, eventData, jQueryEvent){
+                var btn = jQuery(jQueryEvent.target),
+                room_name = btn.closest('.single_room').find('.alt_title').text(),
+                url = location.pathname;
+                var o = {"event" : "push_dynamic_datas",'pagename': 'hotel::hotelpage::roomdetails::'+room_name, 'category': 'hotel','sub_category_level1':'hotelpage','sub_category_level2':'roomdetails::'+room_name,'virtualpageurl':url+'room-details/'+slugify(room_name)};
+                    return o;
+                }},
+        ],
+        'mantis.hotel_section_details_restaurant':[
+            {'selector': '.popup_fancy', formatDlObject:function(dlObject, configuration, eventData, jQueryEvent){
+                    var btn = jQuery(jQueryEvent.target),
+                        room_name = btn.closest('.single_restaurant').find('.alt_title').text(),
+                        url = location.pathname;
+                    var o = {"event" : "push_dynamic_datas",'pagename': 'hotel::hotelpage::restaurants::'+room_name, 'category': 'hotel','sub_category_level1':'hotelpage','sub_category_level2':'restaurants::'+room_name,'virtualpageurl':url+'restaurants'};
+                    return o;
+                }},
+        ],
+        'click' : [
+            //Book now header
+            {'selector': '.book-now-group .button', 'category': 'navigation', 'action': 'click on cta', 'label': 'book now'},
+            //Languages
+            {'selector': '.languages_menu a.actual_lang', 'category': 'navigation', 'action': 'click on cta', 'label': 'en'},
+            //Become a member menu section
+            {'selector': '.become-a-member a', 'category': 'navigation', 'action': 'click on cta', 'label': 'become a member'},
+            //Play video
+            {'selector': '.section.homepage_video .box .open_video', 'category': 'homepage', 'action': 'click on cta', 'label': 'play video'},
+            //Our collection
+            {'selector': '.destinations .single_filter input', 'category': 'our collection', 'action': 'click on cta - filter', 'label': '', 'data': get_filter_title},
+            {'selector': '.hotel_box_list .buttons a.button', 'category': 'our collection', 'action': 'click on cta', 'label': 'load more'},
+            //Experiences
+            {'selector': '.page-template-template-experiences .experiences_list .buttons a.button', 'category': 'global experience page', 'action': 'click on cta', 'label': 'load more'},
+            //Hotel page
+            {'selector': '.single-hotel .menu_box .scroll_to', 'category': 'hotel page', 'action': 'click on cta', 'label': '', 'data': get_link_title},
+            {'selector': '.single-hotel .room_nav a', 'category': 'hotel page', 'action': 'click on cta', 'label': 'Type of room', 'data': get_room_title},
+            {'selector': '.popup_details .content .button', 'category': 'search', 'action': 'click on cta - room details', 'label': 'book now'},
+            {'selector': '.single-hotel .hotel_offer .thumb, .single-hotel .hotel_offer .alt_title, .single-hotel .hotel_offer .more', 'category': 'hotel page', 'action': 'click on cta - suggested offers', 'label': '', 'data' : get_offer_name, 'delayClick': true},
+            {'selector': '.single-hotel .other_hotels_box .hotel .thumb, .single-hotel .other_hotels_box .hotel .alt_title, .single-hotel .other_hotels_box .hotel .more', 'category': 'hotel page', 'action': 'click on cta - suggested hotels', 'label': '', 'data' : get_hotels_name, 'delayClick': true},
+            {'selector': '.single-hotel a.hotel_bf', formatDlObject:function(dlObject, configuration, eventData, jQueryEvent){
+                    var url = location.pathname;
+                    var o = {"event" : "push_dynamic_datas",'pagename': 'hotel::hotelpage::bookingmodule', 'category': 'hotel','sub_category_level1':'hotelpage','sub_category_level2':'bookingmodule','virtualpageurl': url +'online-booking'};
+                    return o;
+                }},
+
+            //Offer page
+            {'selector': '.single-offer .offer_custom_book a.button', formatDlObject:function(dlObject, configuration, eventData, jQueryEvent){
+                    var url = location.pathname;
+                    var o = {"event" : "push_dynamic_datas",'pagename': 'offers::'+mantis_custom_dl.sub_category_level1+'::contactus', 'category': 'offers','sub_category_level1':mantis_custom_dl.sub_category_level1,'sub_category_level2':'contactus','virtualpageurl': url +'contact-us'};
+                    return o;
+                }},
+            {'selector': '.single-offer .tabs_menu .tab_menu', 'category': 'offer page', 'action': 'click on cta', 'label': '', 'data': get_link_title},
+            {'selector': '.single-offer .other_offers_box .offer .thumb,.single-offer .other_offers_box .offer .alt_title a, .single-offer .other_offers_box .offer .more', 'category': 'offer page', 'action': 'click on cta - suggested offers', 'label': '', 'data': get_offer_name_cpt, 'delayClick': true},
+
+
+            //Partner
+            {'selector': '.page-template-default #book_url.offer_custom_book', 'category': 'partner', 'action': 'click on cta', 'label': 'partner with us'},
+            {'selector': '.page-template-default #book_url.offer_custom_book', formatDlObject:function(dlObject, configuration, eventData, jQueryEvent){
+                    var o = {"event" : "push_dynamic_datas",'pagename': 'partner with us pop-in', 'category': mantis_custom_dl.category,'sub_category_level1':mantis_custom_dl.sub_category_level1};
+                    return o;
+                }},
+
+            //Newsletter
+            {'selector': '#mc_embed_signup #mc-embedded-subscribe', 'category': 'newsletter', 'action': 'click on cta', 'label': 'subscribe'},
+            //Contact Traveldesk
+            {'selector': 'a[href="mailto:traveldesk@mantiscollection.com"]', 'category': 'contact traveldesk', 'action': typeof mantis_custom_dl.pagename !== 'undefined' ? mantis_custom_dl.pagename: location.pathname.replace(/^\//, '').replace(/\/$/, '').replace(/\//g, ' - '), 'label': 'email'}
+        ],
+        'submit':[
+            {'selector': '.single-hotel #bookingform', 'category': 'search', 'action': 'click on cta', 'label': 'book now', 'data': read_bf_setting},
+        ],
+        'mantis.contact_form_error':[
+            {'selector': '.page-template-template-contact_us #contact_form', formatDlObject:function(dlObject, configuration, eventData, jQueryEvent){
+                    var fields_required = jQuery('#contact_form .field.alert').find('label').text().replace(/\*/g,', ').replace(/\s+/g,' ');
+                    var o = {'category': 'contacts us', 'action': 'click on cta','label':'submit error - ' + fields_required};
+                    return o;
+                }}
+        ],
+        'mantis.enquire_form_error':[
+            {'selector': '.page-template-template-hotel_form #hotel_form', formatDlObject:function(dlObject, configuration, eventData, jQueryEvent){
+                    var fields_required = jQuery('#hotel_form .field.alert').find('label').text().replace(/\*/g,', ').replace(/\s+/g,' ');
+                    var o = {'category': 'enquire now', 'action': 'click on cta','label':'submit error - ' + fields_required};
+                    return o;
+                }},
+        ],
+        'mantis.offer_form_error':[
+            {'selector': '.single-offer #offer_form', formatDlObject:function(dlObject, configuration, eventData, jQueryEvent){
+                    var fields_required = jQuery('#offer_form .field.alert').find('label').text().replace(/\*/g,', ').replace(/\s+/g,' ');
+                    var o = {'category': 'offer page', 'action': 'click on cta','label':'submit error - ' + fields_required};
+                    return o;
+                }},
+        ],
+        'mantis.contact_form_success':[
+            {'selector': '.page-template-template-contact_us #contact_form', 'category': 'contact us', 'action': 'click on cta', 'label': 'submit'},
+        ],
+        'mantis.enquire_form_success':[
+            {'selector': '.page-template-template-hotel_form #hotel_form', 'category': 'enquire now', 'action': 'click on cta', 'label': 'submit'},
+        ],
+        'mantis.offer_form_success':[
+            {'selector': '.single-offer #offer_form', 'category': 'offer page', 'action': 'click on cta', 'label': 'submit'},
+        ],
+    };
+    window._accor_event_tracking_config = {};
+    for (var key in tmp){
+        if(tmp.hasOwnProperty(key)){
+            window._accor_event_tracking_config[key] = [];
+            for (var i = 0; i< tmp[key].length; i++){
+                var newEl = jQuery.extend(true,{}, tmp[key][i]);
+                newEl.onlyOnce = true;
+                if(typeof newEl.formatDlObject === 'undefined'){
+                    newEl.formatDlObject = convertToAccorFormat;
+                }
+                window._accor_event_tracking_config[key].push(newEl);
+            }
+        }
+    }
+
+})();
